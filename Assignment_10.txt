@@ -1,0 +1,461 @@
+Assignment_10_Stars
+
+-------------- Foothill Class ----------------------------------
+
+import cs_1c.*;
+import java.text.DecimalFormat;
+import java.util.*;
+
+
+public class Foothill {
+
+	public static void main(String[] args) throws Exception {
+
+		int i, k, arraySize;
+		double maxX, minX, maxY, minY, maxZ, minZ;
+		final int NUM_COLS = 70;
+		final int NUM_ROWS = 35;
+		double[] xVals, yVals, zVals;
+
+		//read file
+		StarNearEarthReader fileInput = new StarNearEarthReader(
+				"nearest_stars.txt");
+
+		if (fileInput.readError()) {
+			System.out.println("Error on File name: " + fileInput.getFileName());
+			return;
+		}
+
+		//initialize array of star object
+		arraySize = fileInput.getNumStars();
+		SNE_Analyzer[] starArray = new SNE_Analyzer[arraySize];
+		System.out.println("# of stars: " + fileInput.getNumStars());
+		System.out.println("Nearest Stars File: " + fileInput.getFileName());
+		for (k = 0; k < arraySize; k++)
+			starArray[k] = new SNE_Analyzer(fileInput.getStar(k));
+
+		System.out.println("");
+		//display XYZ table coordinates
+		for (k = 0; k < arraySize; k++)
+			System.out.printf("%45s: %15s \n", starArray[k].getNameCommon(),
+					starArray[k].coordToString());
+
+		//arraySize is 100
+		xVals = new double[arraySize];
+		yVals = new double[arraySize];
+		zVals = new double[arraySize];
+		int[] ranks = new int[arraySize];
+		//initialize min max
+		maxX = minX = maxY = minY = maxZ = minZ = 0;
+
+		//populate coordinates into X Y Z double arrays 
+		//populate rank array
+		//find min max for X Y Z coordinates
+		for (k = 0; k < arraySize; k++) {
+			double x = starArray[k].getX();
+			double y = starArray[k].getY();
+			double z = starArray[k].getZ();
+			xVals[k] = x;
+			yVals[k] = y;
+			zVals[k] = z;
+			ranks[k] = starArray[k].getRank();
+			//			System.out.println(starArray[k].getRank());
+			if (x > maxX) {
+				maxX = x;
+			}
+			else if (x < minX) {
+				minX = x;
+			}
+			if (y > maxY) {
+				maxY = y;
+			}
+			else if (y < minY) {
+				minY = y;
+			}
+			if (z > maxZ) {
+				maxZ = z;
+			}
+			else if (z < minZ) {
+				minZ = z;
+			}
+		}
+
+		//Instantiate and Populate starMap Matrix 
+		System.out.println("Displaying starMap: ");
+		int row, col;
+		System.out.println("Display: " + NUM_ROWS + " X " + NUM_COLS);
+		System.out.println();
+		SparseMat<Character> starMap = new SparseMat<Character>(
+				NUM_ROWS, NUM_COLS, ' ');
+		// scale x y coords
+		for (i = 0; i < arraySize; i++) {
+			double[] coordXY = new double[] {xVals[i],yVals[i]};
+			int[] adjCoord = conversion(
+					coordXY, minX, maxX, minY, maxY, NUM_ROWS, NUM_COLS);
+			row = adjCoord[0];
+			col = adjCoord[1];
+			//set top 10 , type char
+			if (ranks[i] <= 9) {
+				starMap.set(row, col, ("" + ranks[i]).charAt(0));
+			} 
+			else {
+				starMap.set(row, col, '*');
+			}
+		}
+
+		//Set sun as 'S' 
+		double[] coordSun = new double[] {0,0};
+		int[] adjCoord = conversion(coordSun, minX, maxX, minY,
+				maxY, NUM_ROWS, NUM_COLS);
+		row = adjCoord[0];
+		col = adjCoord[1];
+		starMap.set(row, col, 'S');
+
+		//Print loops for starMap matrices
+		String output = "";
+		for (row = 0; row < NUM_ROWS; row++) {
+			output = "";
+			for (col = 0; col < NUM_COLS; col++) {
+				output += starMap.get(row, col);
+			}
+			System.out.println(output);
+		}
+	}
+
+
+
+	private static int[] conversion(double[] coord, double minX, double maxX,
+			double minY, double maxY, int numRows, int numCols) {
+		int[] newArray = new int[2];
+		newArray[0] = (int) ((coord[0] - minX) * numRows / (maxX - minX));
+		newArray[1] = (int) ((coord[1] - minY) * numCols / (maxY - minY));
+		return newArray;
+	}
+}
+// SPARSE MATRIX DS class
+class SparseMat<E> {
+
+	private int rowSize, colSize;
+	private E defaultVal;
+	private FHarrayList <FHlinkedList<MatNode>> rows;
+	private int k;
+
+	public int getRowSize() { 
+		return rowSize; 
+	}
+	public int getColSize() { 
+		return colSize; 
+	}
+
+	// input check create empty 
+	public SparseMat( int numRows, int numCols, E defaultVal) {
+		if ( numRows < 1 || numCols < 1 )
+			throw new IllegalArgumentException();
+
+		rowSize = numRows;
+		colSize = numCols;
+		allocateEmptyMatrix();
+		this.defaultVal = defaultVal;
+	}
+
+	private void allocateEmptyMatrix(){
+		rows = new FHarrayList<>(rowSize);
+		for (k = 0; k < this.rowSize; k++){
+			this.rows.add(new FHlinkedList<>());  
+		}
+	}
+
+	public void clear() {
+		for (k = 0; k < rowSize; k++)
+			rows.get(k).clear();
+	}
+	private boolean valid(int rows, int cols) {
+		if (rows >= 0 && rows < rowSize && cols >= 0 && cols < colSize){
+			return true;
+		}
+		return false;
+	}
+
+	public boolean set(int r, int c, E x)
+	{
+		if (!valid(r, c)){
+			return false;
+		}
+
+		ListIterator<MatNode> iter;
+
+		// iterate along the row, looking for column c
+		for (iter = (ListIterator<MatNode>)rows.get(r).listIterator();
+				iter.hasNext();) {
+			if (iter.next().col == c) {
+				if (x.equals(defaultVal)) {
+					iter.remove();
+				}
+				else{
+					iter.previous().data = x;
+				}
+				return true;
+			}
+		}
+
+		// not found
+		if ( !x.equals(defaultVal) )
+			rows.get(r).add( new MatNode(c, x) );
+		return true;
+	}
+	public E get(int r, int c) {
+
+		if (!valid(r, c))
+			throw new IndexOutOfBoundsException();
+
+		ListIterator<MatNode> iter;
+
+		// iterate along the row, looking for column c
+		for (iter = (ListIterator<MatNode>)rows.get(r).listIterator();
+				iter.hasNext();) {
+			if ( iter.next().col == c ) {
+				return iter.previous().data;
+			}
+		}
+		// not found
+		return defaultVal;
+	}
+
+	public void showSubSquare(int start, int size) {
+		int row, col;
+
+		if (start < 0 || size < 0 || start + size > rowSize 
+				|| start + size > colSize ){
+			return;
+		}
+
+		for (row = start; row < start + size; row++) {
+			for (col = start; col < start + size; col++) {
+				System.out.print( String.format(
+						"%4.1f", (Double)get(row, col)) + " " );
+			}
+			System.out.println();
+		}
+		System.out.println();
+	}
+	protected class MatNode implements Cloneable {
+		public int col;
+		public E data;
+
+		// we need a default constructor for lists
+		MatNode() {
+			col = 0;
+			data = null;
+		}
+
+		MatNode(int cl, E dt) {
+			col = cl;
+			data = dt;
+		}
+
+		public Object clone() throws CloneNotSupportedException {
+			// shallow copy
+			MatNode newObject = (MatNode)super.clone();
+			return (Object) newObject;
+		}
+	};
+}
+class SNE_Analyzer extends StarNearEarth {
+	private double x, y, z;
+
+	// construct an SNE_Analyzer from a StartNearEarth object
+	public SNE_Analyzer( StarNearEarth sne )
+	{
+		setRank(sne.getRank()); 
+		setNameCns(sne.getNameCns());
+		setNumComponents(sne.getNumComponents());
+		setNameLhs(sne.getNameLhs());
+		setRAsc(sne.getRAsc());
+		setDec(sne.getDec());
+		setPropMotionMag(sne.getPropMotionMag());
+		setPropMotionDir(sne.getPropMotionDir());
+		setParallaxMean(sne.getParallaxMean());
+		setParallaxVariance(sne.getParallaxVariance());
+		SetBWhiteDwarfFlag(sne.getWhiteDwarfFlag());
+		setSpectralType(sne.getSpectralType());
+		setMagApparent(sne.getMagApparent());
+		setMagAbsolute(sne.getMagAbsolute());
+		setMass(sne.getMass());
+		setNotes(sne.getNotes());
+		setNameCommon(sne.getNameCommon()); 
+		calcCartCoords();
+	}
+
+	public void calcCartCoords() {
+		double lightYears = 3.262 / (getParallaxMean());
+		double rAsc = Math.toRadians(getRAsc());
+		double dec = Math.toRadians(getDec());
+		x = lightYears * Math.cos(dec) * Math.cos(rAsc);
+		y = lightYears * Math.cos(dec) * Math.sin(rAsc);
+		z = lightYears * Math.sin(dec);
+	}
+	double getX() {
+		return x;
+	}
+
+	double getY() {
+		return y;
+	}
+
+	double getZ() {
+		return z;
+	}
+	public String coordToString() {
+		DecimalFormat df = new DecimalFormat("##.###");
+		return String.format(" %10s %10s %10s", df.format(x),
+				df.format(y), df.format(z));
+	}
+}
+
+
+-------------- Run Output ------------------------------------------
+
+
+# of stars: 100
+Nearest Stars File: nearest_stars.txt
+
+                             Proxima Centauri:      -1.546     -1.183     -3.769 
+                               Barnard's Star:      -0.057     -5.943      0.488 
+                                     Wolf 359:       -7.43      2.114      0.951 
+                                Lalande 21185:      -6.506      1.642       4.87 
+                                       Sirius:      -1.609      8.062     -2.469 
+                                      BL Ceti:       7.541      3.477      -2.69 
+                                     Ross 154:        1.91     -8.648     -3.913 
+                                     Ross 248:       7.381     -0.584      7.193 
+                              epsilon Eridani:       6.214      8.315     -1.729 
+                                Lacaille 9352:       8.466     -2.038     -6.292 
+                                     Ross 128:     -10.903      0.584     -0.153 
+                                 EZ Aquarii A:      10.189     -3.782     -2.974 
+                                      Procyon:      -4.768     10.307      1.038 
+                                   61 Cygni A:       6.475     -6.097      7.138 
+                             (no common name):       1.081     -5.726      9.945 
+                                GX Andromedae:       8.333      0.669      8.079 
+                               epsilon Indi A:       5.657     -3.157     -9.894 
+                                    DX Cancri:      -6.421      8.382      5.328 
+                                     tau Ceti:      10.273      5.014     -3.264 
+         Henry et al. 1997, Henry et al. 2006:       5.027      6.918     -8.407 
+                                      YZ Ceti:      11.028       3.61     -3.547 
+                                Luyten's Star:      -4.584     11.431      1.126 
+                            Henry et al. 2006:       8.723      8.206      3.634 
+                            Henry et al. 2006:       1.079     -5.412    -11.297 
+                               Kapteyn's Star:       1.891      8.833     -9.039 
+                               AX Microscopii:       7.599     -6.533     -8.077 
+                                  Kruger 60 A:       6.469     -2.746     11.115 
+           Jao et al. 2005, Costa et al. 2005:      -9.606       3.11     -8.453 
+                                   Ross 614 A:      -1.705     13.225     -0.655 
+                                    Wolf 1061:      -5.144    -12.466      -3.03 
+                            van Maanen's Star:      13.685      2.981      1.321 
+                             (no common name):      11.309      0.267     -8.636 
+                                   Wolf 424 A:     -13.987     -2.046      2.244 
+                                   TZ Arietis:      12.235      7.079      3.277 
+                             (no common name):      -0.561     -5.432      13.75 
+                             (no common name):     -13.811      4.474     -2.911 
+                             (no common name):       -1.38    -10.026    -10.813 
+                                  G 208-044 A:       5.045     -9.301     10.367 
+                                  WD 1142-645:      -6.391      0.399    -13.633 
+                             (no common name):      15.176      0.445     -2.009 
+                                     Ross 780:      14.245     -4.269     -3.781 
+                            Henry et al. 2006:      -7.113      2.437    -13.682 
+                             (no common name):     -11.157      2.706     10.904 
+                             (no common name):      -9.167      4.703     12.044 
+                             (no common name):     -13.578      6.361      5.419 
+                             (no common name):        8.47     -6.292    -12.142 
+                             (no common name):        7.59     10.797     -9.389 
+                            Costa et al. 2005:       7.977      7.639     -11.85 
+                             (no common name):      -1.169    -11.631    -11.415 
+                            omicron 2 Eridani:       7.168     14.579     -2.183 
+                                  EV Lacertae:      11.186     -3.699     11.511 
+                                70 Ophiuchi A:       0.395    -16.626      0.726 
+                                       Altair:       7.683    -14.637      2.579 
+                                    EI Cancri:     -11.265      11.44      5.768 
+                            Henry et al. 2006:      -0.004     17.066      0.807 
+                            Henry et al. 2006:       4.318     16.681     -2.099 
+                             (no common name):      -3.437      0.185     17.212 
+                                     Wolf 498:     -15.325     -7.617      4.551 
+                             (no common name):      11.711    -12.499     -5.228 
+                                   Stein 2051:       3.517      8.617     15.476 
+                             (no common name):      -3.598     14.755      9.964 
+                             (no common name):       2.399    -15.313     10.065 
+                                    Wolf 1453:       2.309      18.44     -1.194 
+                             (no common name):       8.137     16.558     -3.115 
+                               sigma Draconis:       2.561     -6.008      17.62 
+                             (no common name):      -0.806     17.463     -7.015 
+                             (no common name):      -0.601    -10.241    -15.992 
+                                    Wolf 1055:       6.257    -17.937      1.718 
+                                      Ross 47:       1.454     18.637      4.141 
+                             (no common name):     -12.781    -12.502     -7.012 
+                              Jao et al. 2005:       4.666    -12.681    -13.778 
+                             (no common name):      19.319     -0.911      0.811 
+                              eta Cassiopei A:      10.083      2.194     16.396 
+                             (no common name):      -8.753    -11.637    -12.781 
+                             (no common name):      18.603      1.257     -5.394 
+                                     Ross 882:      -8.569     17.441      1.206 
+                                36 Ophiuchi A:      -3.371    -17.082      -8.72 
+                             (no common name):       8.635    -13.401    -11.625 
+                                   82 Eridani:       9.287     11.059      -13.5 
+                             (no common name):      -0.337      -6.48     18.713 
+                                delta Pavonis:       4.284     -6.808    -18.221 
+                                 QY Aurigae A:      -4.711     14.937     12.471 
+                                    HN Librae:     -15.288     -12.19     -4.342 
+                             (no common name):     -14.173      10.15      9.869 
+                             (no common name):      -9.147      8.067     16.002 
+                             (no common name):        7.87    -11.903    -14.351 
+                                     Wolf 562:     -13.082    -15.513     -2.752 
+                                    EQ Pegasi:      19.296     -2.381      7.052 
+                            Henry et al. 2006:     -13.672     13.626      7.734 
+                            Henry et al. 2006:     -16.076     -2.749    -12.919 
+                             (no common name):      -3.025    -14.266     14.926 
+                             (no common name):       -13.2    -12.818     -9.851 
+                             (no common name):      -5.969    -14.644     13.681 
+                                  WD 0552-041:       0.444     20.985     -1.531 
+                                   Wolf 630 A:      -5.787    -20.007     -3.052 
+                             (no common name):       11.29     -2.334     17.867 
+                              Jao et al. 2005:      -6.342      4.328    -19.882 
+                                  GL Virginis:     -20.861     -1.733      4.117 
+                             (no common name):       -5.03    -11.486     17.453 
+                                     Ross 104:     -19.341      5.176       8.43 
+Displaying starMap: 
+Display: 35 X 70
+
+                               *                                      
+                                           *                          
+                                                                      
+                                                                      
+             *       *       *                                        
+                              *                    *                  
+       *    *                            *   *           *            
+            *                                                         
+                                   *  *              *                
+                                       *                              
+              *                           *    *               *      
+                                     3*                               
+         *                        * 4    *      *                     
+*           * *                                                       
+                                                   * *     *          
+    *    *                        *                        *          
+                 *              1              5        *             
+              * *      **                                      *      
+     *                  2         S                            *      
+                   7    *                        *               *    
+        *              *                                         *    
+                      *                         *             *       
+            *     *                          *                        
+   *                   *    **                  9                     
+         *             *         8      6           *      *          
+           * *         *      *    *           **             *       
+                                     *               *                
+                           *            * *                           
+            *                 *   *           *                       
+                                                                      
+                          *            *                              
+                                  *                                   
+                                                                      
+                                                                      
+                              *     *                                 
+
+
